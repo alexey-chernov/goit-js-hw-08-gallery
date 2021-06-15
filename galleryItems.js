@@ -1,5 +1,4 @@
-'use strict'
-export default [
+const galleryItems = [
   {
     preview:
       'https://cdn.pixabay.com/photo/2019/05/14/16/43/himilayan-blue-poppy-4202825__340.jpg',
@@ -65,91 +64,127 @@ export default [
   },
 ];
 
-import pictures from "./galleryItems.js";
-
 const refs = {
-  galery: document.querySelector('.js-gallery'),
-  lightbox: document.querySelector('.js-lightbox'),
-  lightboxImage: document.querySelector('.lightbox__image'),
-  body: document.querySelector('body'),
-  closeButton: document.querySelector('button[data-action="close-lightbox"]'),
-}
-
-const changePicture = (src, alt) => {
-  refs.lightboxImage.src = src;
-  refs.lightboxImage.alt = alt;
+  galleryContainer: document.querySelector('.js-gallery'),
+  lightbox: document.querySelector('.lightbox'),
+  lightboxOverlay: document.querySelector('.lightbox__overlay'),
+  btnModalClose: document.querySelector('.lightbox__button'),
+  lightboxContent: document.querySelector('.lightbox__content'),
+  lightboxContentImage: document.querySelector('.lightbox__image'),
 };
 
-const makeGalery = () => {
-  let htmlText = '';
-  pictures.map(({ preview, original, description }) => {
-    htmlText += `<li class="gallery__item">
-                <a
+const galleryItemMarkup = createItemCardsMarkup(galleryItems);
+
+refs.galleryContainer.insertAdjacentHTML('beforeend', galleryItemMarkup);
+refs.galleryContainer.addEventListener('click', openModal);
+refs.btnModalClose.addEventListener('click', closeModal);
+refs.lightboxOverlay.addEventListener('click', onBackdropClick);
+
+function createItemCardsMarkup(galleryItems) {
+  return galleryItems
+    .map(({ preview, original, description }, index) => {
+      return `
+      <li 
+          class="gallery__item">
+              <a
                   class="gallery__link"
                   href="${original}"
-                >
-                  <img
-                    class="gallery__image"
-                    src="${preview}"
-                    data-source="${original}"
-                    alt="${description}"
-                  />
-                </a>
-              </li>`
-  });
-  refs.galery.innerHTML = htmlText;
-}
-makeGalery();
+              >
+              <img
+                  class="gallery__image"
+                  id="${index + 1}"
+                  src="${preview}"
+                  data-source="${original}"
+                  alt="${description}"
+              />
+              </a>
+      </li>`;
+    })
+    .join('');
+};
 
-const openModal = (e) => {
-  e.preventDefault();
-  if (e.target.nodeName !== 'IMG') return
-
-  changePicture(e.target.dataset.source, e.target.attributes.alt.nodeValue);
-  refs.lightbox.classList.add('is-open');
-  refs.body.style.overflow = 'hidden';
-}
-refs.galery.addEventListener('click', openModal);
-
-const closeModal = e => {
-  e.preventDefault();
-  if (e.target.nodeName === 'IMG') return
-  if (!refs.lightbox.classList.contains('is-open')) return
-
-  changePicture('', '');
-  refs.lightbox.classList.remove('is-open');
-  refs.body.style.overflow = 'initial';
-}
-refs.lightbox.addEventListener('click', closeModal);
-
-const showPictureLeftRightKey = (e) => {
-  let x = -1;
-  pictures.forEach((picture, index, array) => {
-    if (picture.original === refs.lightboxImage.src && x === -1) {
-      if (e.code === 'ArrowLeft') {
-        x = index > 0 ? index - 1 : array.length - 1;
-      } else {
-        x = index === array.length - 1 ? 0 : index + 1;
-      }
-      changePicture(array[x].original, array[x].description);
-    };
-  });
+function getImgAttributes(event) {
+  const imgTargetEl = event.target;
+  refs.lightboxContentImage.src = `${imgTargetEl.dataset.source}`;
+  refs.lightboxContentImage.alt = `${imgTargetEl.alt}`;
+  refs.lightboxContentImage.id = `${imgTargetEl.id}`;
 }
 
-document.addEventListener('keydown', (event) => {
-  if (!refs.lightbox.classList.contains('is-open')) return
+function removeImgAttributes() {
+  refs.lightboxContentImage.removeAttribute("src");
+  refs.lightboxContentImage.removeAttribute("alt");
+  refs.lightboxContentImage.removeAttribute("id");
+};
 
-  switch (event.code) {
-    case 'Escape':
-      closeModal(event);
-      break;
-
-    case 'ArrowLeft':
-      showPictureLeftRightKey(event);
-      break;
-
-    case 'ArrowRight':
-      showPictureLeftRightKey(event);
-      break;
+function openModal(event) {
+  event.preventDefault();
+  const isImageEl = event.target.classList.contains('gallery__image');
+  if (!isImageEl) {
+    return;
   }
-});
+  refs.lightbox.classList.add('is-open');
+  getImgAttributes(event);
+  window.addEventListener('keydown', onPressEscKey);
+  window.addEventListener('keydown', onLeftRightKey);
+};
+
+function closeModal() {
+  refs.lightbox.classList.remove('is-open');
+  removeImgAttributes();
+  window.removeEventListener('keydown', onPressEscKey);
+  window.removeEventListener('keydown', onLeftRightKey);
+};
+
+function onPressEscKey(event) {
+  const EscKeyCode = 'Escape';
+  if (event.code === EscKeyCode) {
+    closeModal();
+  }
+};
+
+function onBackdropClick(event) {
+  if (event.currentTarget === event.target) {
+    closeModal();
+  }
+};
+
+function onLeftRightKey(event) {
+  const ArrR_KEY_CODE = 'ArrowRight';
+  const ArrL_KEY_CODE = 'ArrowLeft';
+  const currentId = refs.lightboxContentImage.getAttribute("id");
+  if (event.code === ArrR_KEY_CODE) {
+    const newId = + currentId + 1;
+    changeImageOnPressRight(newId);
+  } else if (event.code === ArrL_KEY_CODE) {
+    const newId = + currentId - 1;
+    changeImageOnPressLeft(newId);
+  }
+};
+
+function changeImageOnPressRight(argument) {
+  if (argument <= galleryItems.length) {
+    const nextImg = document.getElementById(`${argument}`);
+    const nextSrc = nextImg.getAttribute("data-source");
+    refs.lightboxContentImage.id = `${argument}`;
+    refs.lightboxContentImage.src = `${nextSrc}`;
+  } else {
+    const nextImg = document.getElementById(`${argument - galleryItems.length}`);
+    const nextSrc = nextImg.getAttribute("data-source");
+    refs.lightboxContentImage.id = `${argument - galleryItems.length}`;
+    refs.lightboxContentImage.src = `${nextSrc}`;
+  }
+};
+
+function changeImageOnPressLeft(argument) {
+  if (argument >= 1) {
+    const nextImg = document.getElementById(`${argument}`);
+    const nextSrc = nextImg.getAttribute("data-source");
+    refs.lightboxContentImage.id = `${argument}`;
+    refs.lightboxContentImage.src = `${nextSrc}`;
+  } else {
+    const nextImg = document.getElementById(`${argument + galleryItems.length}`);
+    const nextSrc = nextImg.getAttribute("data-source");
+    refs.lightboxContentImage.id = `${argument + galleryItems.length}`;
+    refs.lightboxContentImage.src = `${nextSrc}`;
+  }
+};
